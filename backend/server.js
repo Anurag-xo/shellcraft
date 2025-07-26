@@ -1,12 +1,33 @@
+// backend/server.js
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const { Docker } = require("node-docker-api");
 const rateLimit = require("express-rate-limit");
 const helmet = require("helmet");
 const { v4: uuidv4 } = require("uuid");
+// --- Add Supabase import ---
+const { createClient } = require("@supabase/supabase-js");
+// --------------------------
 
 const app = express();
 const docker = new Docker({ socketPath: "/var/run/docker.sock" });
+
+// --- Supabase Client Configuration (Add your credentials) ---
+// It's highly recommended to use environment variables for these.
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY; // Use service role key for backend access
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error("FATAL: Supabase URL or Service Role Key not configured.");
+  console.error(
+    "Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.",
+  );
+  process.exit(1); // Exit if critical config is missing
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+// -------------------------------------------------------------
 
 // Security middleware
 app.use(helmet());
@@ -46,88 +67,33 @@ app.post("/api/execute", async (req, res) => {
     });
   }
 
-  // REMOVED THE DANGEROUS COMMAND BLACKLIST
-  // // Security: Basic script validation
-  // const dangerousCommands = [
-  //   'rm -rf /',
-  //   'dd if=',
-  //   'mkfs',
-  //   'fdisk',
-  //   'format',
-  //   'del /f',
-  //   'shutdown',
-  //   'reboot',
-  //   'halt',
-  //   'poweroff',
-  //   'init 0',
-  //   'init 6',
-  //   'kill -9 1',
-  //   'killall',
-  //   'pkill',
-  //   'curl',
-  //   'wget',
-  //   'nc ',
-  //   'netcat',
-  //   'telnet',
-  //   'ssh',
-  //   'scp',
-  //   'rsync',
-  //   'mount',
-  //   'umount',
-  //   'chroot',
-  //   'sudo',
-  //   'su ',
-  //   'passwd',
-  //   'useradd',
-  //   'userdel',
-  //   'usermod',
-  //   'groupadd',
-  //   'groupdel',
-  //   'crontab',
-  //   'at ',
-  //   'batch',
-  //   'nohup &',
-  //   'disown',
-  //   '&& rm',
-  //   '; rm',
-  //   '| rm',
-  //   'eval',
-  //   'exec',
-  //   '$()',
-  //   '`',
-  //   'python',
-  //   'node',
-  //   'ruby',
-  //   'perl',
-  //   'php',
-  //   'java',
-  //   'gcc',
-  //   'make',
-  //   'cmake'
-  // ];
-  //
+  // --- REMOVED: Unreliable dangerous command blacklist ---
+  // const dangerousCommands = [ ... ]; // All items removed
   // const scriptLower = script.toLowerCase();
   // const foundDangerous = dangerousCommands.find(cmd => scriptLower.includes(cmd));
-  //
   // if (foundDangerous) {
   //   return res.status(400).json({
   //     error: `Dangerous command detected: ${foundDangerous}`,
   //     execution_id: executionId
   //   });
   // }
-  // --- END REMOVED SECTTON ---
+  // --- END REMOVED SECTION ---
 
   let container;
   const startTime = Date.now();
 
   try {
-    // Create container with security constraints
+    // Security: Ensure script is properly escaped for shell inclusion
+    // (This escaping is still important for the shell command itself, even with containerization)
+    const escapedScript = script.replace(/"/g, '\\"');
+
+    // Create container with security constraints (this is the primary defense now)
     container = await docker.container.create({
       Image: "alpine:latest",
       Cmd: [
         "sh",
         "-c",
-        `timeout ${Math.floor(timeout / 1000)} sh -c "${script.replace(/"/g, '\\"')}"`,
+        `timeout ${Math.floor(timeout / 1000)} sh -c "${escapedScript}"`,
       ],
       WorkingDir: "/tmp",
       User: "1000:1000", // Non-root user
@@ -147,16 +113,18 @@ app.post("/api/execute", async (req, res) => {
       ],
       HostConfig: {
         AutoRemove: true,
-        ReadonlyRootfs: true,
+        ReadonlyRootfs: true, // Read-only filesystem (except Tmpfs)
         NoNewPrivileges: true,
-        CapDrop: ["ALL"],
-        SecurityOpt: ["no-new-privileges:true"],
+        CapDrop: ["ALL"], // Drop all capabilities
+        SecurityOpt: ["no-new-privileges:true"], // Prevent privilege escalation
         Tmpfs: {
+          // Allow writing only to limited temporary filesystems
           "/tmp": "rw,noexec,nosuid,size=10m",
           "/var/tmp": "rw,noexec,nosuid,size=10m",
         },
         Ulimits: [
-          { Name: "nproc", Soft: 10, Hard: 10 },
+          // Limit resources further
+          { Name: "nproc", Soft: 10, Hard: 10 }, // Max 10 processes
           { Name: "fsize", Soft: 1024 * 1024, Hard: 1024 * 1024 }, // 1MB file size limit
         ],
       },
@@ -208,10 +176,16 @@ app.post("/api/execute", async (req, res) => {
     const executionTime = Date.now() - startTime;
     const success = !error && container.data?.State?.ExitCode === 0;
 
-    // Basic test case validation for known challenges
+    // Data-driven test case validation for known challenges
     let testResults = [];
     if (challengeId) {
-      testResults = validateChallengeOutput(challengeId, script, output, error);
+      testResults = await validateChallengeOutput(
+        supabase,
+        challengeId,
+        script,
+        output,
+        error,
+      );
     }
 
     res.json({
@@ -245,56 +219,167 @@ app.post("/api/execute", async (req, res) => {
   }
 });
 
-// Validate challenge-specific outputs
-function validateChallengeOutput(challengeId, script, output, error) {
+// --- Refactored validateChallengeOutput to use database-driven rules ---
+async function validateChallengeOutput(
+  supabaseClient,
+  challengeId,
+  script,
+  output,
+  error,
+) {
   const testResults = [];
 
-  switch (challengeId) {
-    case "basic-ls":
-      testResults.push({
-        test_case: "Files are listed in long format",
-        passed: script.includes("-l"),
-        expected: "Command should include -l flag",
-        actual: script.includes("-l") ? "Found -l flag" : "Missing -l flag",
-      });
+  try {
+    // 1. Fetch the challenge and its validation rules from the database
+    const { data: challenge, error: fetchError } = await supabaseClient
+      .from("challenges")
+      .select("validation_rules")
+      .eq("id", challengeId)
+      .single(); // Challenge should exist if challengeId is valid
 
-      testResults.push({
-        test_case: "Hidden files are shown",
-        passed: script.includes("-a"),
-        expected: "Command should include -a flag",
-        actual: script.includes("-a") ? "Found -a flag" : "Missing -a flag",
-      });
+    if (fetchError) {
+      console.error(
+        "Error fetching challenge for validation:",
+        challengeId,
+        fetchError,
+      );
+      // Gracefully handle fetch error, maybe return a generic failure result
+      return [
+        {
+          test_case: "Validation Setup",
+          passed: false,
+          expected: "Challenge data loaded",
+          actual: `Error loading challenge data: ${fetchError.message}`,
+        },
+      ];
+    }
 
-      testResults.push({
-        test_case: "Output sorted by modification time",
-        passed: script.includes("-t"),
-        expected: "Command should include -t flag",
-        actual: script.includes("-t") ? "Found -t flag" : "Missing -t flag",
-      });
-      break;
+    // 2. Get the validation rules array (defaults to empty array if null/undefined)
+    const rules = challenge?.validation_rules || [];
 
-    case "file-permissions":
-      testResults.push({
-        test_case: "Uses chmod command",
-        passed: script.includes("chmod"),
-        expected: "Command should use chmod",
-        actual: script.includes("chmod")
-          ? "Found chmod command"
-          : "Missing chmod command",
-      });
-      break;
-
-    default:
+    // 3. If no rules are defined, default to checking for execution success/errors
+    if (rules.length === 0) {
       testResults.push({
         test_case: "Script executed successfully",
         passed: !error,
         expected: "No errors during execution",
         actual: error ? `Error: ${error}` : "Executed successfully",
       });
+      return testResults; // Return early if no specific rules
+    }
+
+    // 4. Iterate through the rules and apply validation logic
+    for (const [index, rule] of rules.entries()) {
+      let passed = false;
+      let message = "";
+      let expected = rule.description || `Rule ${index + 1} passed`;
+      let actual = "";
+
+      try {
+        switch (rule.type) {
+          case "script_includes":
+            // Check if the submitted script contains a specific substring
+            passed = script.includes(rule.pattern);
+            actual = passed
+              ? `Found '${rule.pattern}' in script`
+              : `Script does not contain '${rule.pattern}'`;
+            break;
+
+          case "script_includes_regex":
+            // Check if the script matches a regular expression
+            try {
+              const regex = new RegExp(rule.pattern);
+              passed = regex.test(script);
+              actual = passed
+                ? `Script matches pattern '${rule.pattern}'`
+                : `Script does not match pattern '${rule.pattern}'`;
+            } catch (e) {
+              console.error(
+                "Invalid regex in script validation rule:",
+                rule.pattern,
+                e,
+              );
+              passed = false;
+              actual = `Invalid validation regex: ${rule.pattern}`;
+            }
+            break;
+
+          case "output_includes":
+            // Check if the command output contains a specific substring
+            passed = (output || "").includes(rule.pattern);
+            actual = passed
+              ? `Found '${rule.pattern}' in output`
+              : `Output does not contain '${rule.pattern}'`;
+            break;
+
+          case "output_matches_regex":
+            // Check if the output matches a regular expression
+            try {
+              const outputRegex = new RegExp(rule.pattern);
+              passed = outputRegex.test(output || "");
+              actual = passed
+                ? `Output matches pattern '${rule.pattern}'`
+                : `Output does not match pattern '${rule.pattern}'`;
+            } catch (e) {
+              console.error(
+                "Invalid regex in output validation rule:",
+                rule.pattern,
+                e,
+              );
+              passed = false;
+              actual = `Invalid validation regex: ${rule.pattern}`;
+            }
+            break;
+
+          case "no_error":
+            // Explicitly check that no error occurred
+            passed = !error;
+            actual = passed
+              ? "No execution errors"
+              : `Execution error: ${error}`;
+            break;
+
+          // --- Add more rule types here as needed ---
+          // case 'custom_script_validation':
+          //   // Run a custom validation script against output/script
+          //   // Requires significant security considerations
+          //   break;
+
+          default:
+            console.warn(
+              "Unknown validation rule type encountered:",
+              rule.type,
+            );
+            passed = false;
+            expected = `Unknown rule type: ${rule.type}`;
+            actual = "Rule type not implemented";
+        }
+      } catch (validationError) {
+        console.error("Error applying validation rule:", rule, validationError);
+        passed = false;
+        actual = `Validation error: ${validationError.message}`;
+      }
+
+      testResults.push({
+        test_case: rule.description || `Rule ${index + 1}`, // Use description or generic name
+        passed,
+        expected,
+        actual,
+      });
+    }
+  } catch (err) {
+    console.error("Unexpected error in validateChallengeOutput:", err);
+    testResults.push({
+      test_case: "Validation System",
+      passed: false,
+      expected: "Validation to complete successfully",
+      actual: `Internal validation error: ${err.message}`,
+    });
   }
 
   return testResults;
 }
+// --- End of refactored validateChallengeOutput ---
 
 // Terminal session endpoint (for future WebSocket implementation)
 app.post("/api/terminal/create", async (req, res) => {
@@ -340,4 +425,3 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
-
