@@ -90,7 +90,7 @@ export const challengeApi = {
       .single();
 
     if (error) {
-      console.error("Error creating challenge:", error);
+      console.error("Error creating challenge:", challenge, error);
       throw error;
     }
     return data;
@@ -105,7 +105,7 @@ export const challengeApi = {
       .single();
 
     if (error) {
-      console.error("Error updating challenge:", id, error);
+      console.error("Error updating challenge:", id, updates, error);
       throw error;
     }
     return data;
@@ -329,10 +329,9 @@ export const leaderboardApi = {
       .limit(safeLimit);
 
     if (error) {
-      console.error("Error fetching leaderboard:", error);
+      console.error("Error fetching leaderboard:", limit, error);
       throw error;
     }
     return data || [];
   },
 };
-
