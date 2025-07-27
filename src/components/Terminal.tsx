@@ -1,40 +1,64 @@
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
 // src/components/Terminal.tsx
 import React, { useEffect, useRef } from "react";
 import { Terminal as XTerm } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import "xterm/css/xterm.css";
-import { RefreshCw } from "lucide-react"; // Removed Play, Square
-=======
-// src/components/Terminal.tsx (Minimal Test Version)
-import React from "react";
->>>>>>> Stashed changes
-=======
-// src/components/Terminal.tsx (Minimal Test Version)
-import React from "react";
->>>>>>> Stashed changes
+import { RefreshCw } from "lucide-react";
 
 interface TerminalProps {
-  // code: string; // These props are likely for external sync, but internal buffer handles input
-  // onCodeChange: (code: string) => void; // If needed, logic must be adjusted
   onExecute: (code: string) => Promise<{ output: string; success: boolean }>;
   className?: string;
 }
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-export default function Terminal({
-  // code,
-  // onCodeChange,
-  onExecute,
-  className = "",
-}: TerminalProps) {
+export default function Terminal({ onExecute, className = "" }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
-  // Removed unused state: const [isExecuting, setIsExecuting] = useState(false);
-  // Removed unused state: const [currentInput, setCurrentInput] = useState("");
+  const inputBufferRef = useRef<string>("");
+  const isExecutingRef = useRef<boolean>(false);
+
+  const writePrompt = () => {
+    if (xtermRef.current) {
+      xtermRef.current.write(
+        "\r\n\x1b[1;34muser@shellcraft\x1b[0m:\x1b[1;36m~\x1b[0m$ ",
+      );
+    }
+  };
+
+  const executeCommand = async (command: string) => {
+    if (isExecutingRef.current || !command.trim()) return;
+
+    isExecutingRef.current = true;
+
+    try {
+      const result = await onExecute(command);
+
+      if (xtermRef.current) {
+        if (result.output) {
+          xtermRef.current.write(`\r${result.output.replace(/\n/g, "\r\n")}`);
+        }
+
+        if (result.success === false && !result.output.includes("Error:")) {
+          xtermRef.current.write(
+            `\r\x1b[1;31mCommand execution reported failure.\x1b[0m`,
+          );
+        }
+      }
+    } catch (error: any) {
+      console.error("Terminal execution error:", error);
+      xtermRef.current?.write(
+        `\r\x1b[1;31mError: ${error.message || error.toString()}\x1b[0m`,
+      );
+    } finally {
+      if (xtermRef.current) {
+        xtermRef.current.write("\r\n");
+        writePrompt();
+      }
+      inputBufferRef.current = "";
+      isExecutingRef.current = false;
+      xtermRef.current?.focus();
+    }
+  };
 
   useEffect(() => {
     if (!terminalRef.current) return;
@@ -73,60 +97,31 @@ export default function Terminal({
 
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
+
+    // Open terminal
     terminal.open(terminalRef.current);
-    fitAddon.fit();
+
+    // ✅ Defer fit() until the next frame to ensure renderer is ready
+    const timeoutId = setTimeout(() => {
+      try {
+        fitAddon.fit();
+      } catch (err) {
+        console.warn("Fit failed on initial render, will retry on resize", err);
+      }
+    }, 0);
 
     xtermRef.current = terminal;
     fitAddonRef.current = fitAddon;
 
     terminal.focus();
 
-    terminal.writeln("\x1b[1;32m╭─ ShellCraft Terminal\x1b[0m");
-    terminal.writeln(
+    // Welcome message
+    terminal.write("\x1b[1;32m╭─ ShellCraft Terminal\x1b[0m\r\n");
+    terminal.write(
       "\x1b[1;32m╰─\x1b[0m Type your shell commands and press Enter to execute",
     );
-    terminal.write("\n\x1b[1;34muser@shellcraft\x1b[0m:\x1b[1;36m~\x1b[0m$ ");
 
-    const inputBufferRef = useRef<string>("");
-    const isExecutingRef = useRef<boolean>(false); // Track execution locally
-
-    const writePrompt = () => {
-      terminal.write("\x1b[1;34muser@shellcraft\x1b[0m:\x1b[1;36m~\x1b[0m$ ");
-    };
-
-    const executeCommand = async (command: string) => {
-      if (isExecutingRef.current) return;
-      isExecutingRef.current = true;
-
-      terminal.write(`\r\n$ ${command}`);
-
-      try {
-        const result = await onExecute(command);
-        if (result.output) {
-          if (!result.output.startsWith("\n")) {
-            terminal.write(`\r\n${result.output}`);
-          } else {
-            terminal.write(`${result.output}`);
-          }
-        }
-        if (result.success === false && !result.output?.includes("Error:")) {
-          terminal.write(
-            `\r\n\x1b[1;31mCommand execution reported failure.\x1b[0m`,
-          );
-        }
-      } catch (error: any) {
-        console.error("Terminal execution error:", error);
-        terminal.write(
-          `\r\n\x1b[1;31mError: ${error.message || error.toString()}\x1b[0m`,
-        );
-      } finally {
-        terminal.write("\r\n");
-        writePrompt();
-        inputBufferRef.current = "";
-        isExecutingRef.current = false;
-        terminal.focus();
-      }
-    };
+    writePrompt();
 
     const onDataHandler = (data: string) => {
       if (isExecutingRef.current) return;
@@ -134,18 +129,16 @@ export default function Terminal({
       const charCode = data.charCodeAt(0);
 
       if (data === "\r") {
+        // Enter
         terminal.write("\r\n");
-        const commandToExecute = inputBufferRef.current.trim();
-        if (commandToExecute) {
-          executeCommand(commandToExecute);
-        } else {
-          writePrompt();
-        }
+        const cmd = inputBufferRef.current.trim();
+        if (cmd) executeCommand(cmd);
         inputBufferRef.current = "";
         return;
       }
 
       if (charCode === 127) {
+        // Backspace
         if (inputBufferRef.current.length > 0) {
           inputBufferRef.current = inputBufferRef.current.slice(0, -1);
           terminal.write("\b \b");
@@ -156,38 +149,43 @@ export default function Terminal({
       if (charCode >= 32 && charCode <= 126) {
         inputBufferRef.current += data;
         terminal.write(data);
-        // Optionally call onCodeChange(inputBufferRef.current) if external sync is needed
-        // onCodeChange(inputBufferRef.current);
-        return;
       }
     };
 
     const onDataDisposable = terminal.onData(onDataHandler);
 
+    // ✅ Safe resize handler
     const handleResize = () => {
-      if (fitAddonRef.current) {
-        fitAddonRef.current.fit();
+      try {
+        if (fitAddonRef.current && xtermRef.current?.element) {
+          fitAddonRef.current.fit();
+        }
+      } catch (err) {
+        console.warn("Resize failed", err);
       }
     };
+
     window.addEventListener("resize", handleResize);
+
+    // Initial resize after render
+    handleResize();
 
     return () => {
       window.removeEventListener("resize", handleResize);
       onDataDisposable.dispose();
+      clearTimeout(timeoutId);
       terminal.dispose();
     };
-  }, [onExecute]); // Removed isExecuting, code, onCodeChange from deps
+  }, [onExecute]);
 
   const handleClear = () => {
     if (xtermRef.current) {
       xtermRef.current.clear();
-      xtermRef.current.writeln("\x1b[1;32m╭─ ShellCraft Terminal\x1b[0m");
-      xtermRef.current.writeln(
+      xtermRef.current.write("\x1b[1;32m╭─ ShellCraft Terminal\x1b[0m\r\n");
+      xtermRef.current.write(
         "\x1b[1;32m╰─\x1b[0m Type your shell commands and press Enter to execute",
       );
-      xtermRef.current.write(
-        "\n\x1b[1;34muser@shellcraft\x1b[0m:\x1b[1;36m~\x1b[0m$ ",
-      );
+      writePrompt();
       xtermRef.current.focus();
     }
   };
@@ -201,29 +199,13 @@ export default function Terminal({
           <div className="w-3 h-3 bg-green-500 rounded-full"></div>
           <span className="ml-4 text-sm text-gray-400">Terminal</span>
         </div>
-        <div className="flex items-center space-x-2">
-          {/* Removed onClick handler that referenced undefined handleExecute */}
-          <button
-            // onClick={handleExecute} // REMOVED THIS LINE
-            // disabled={isExecuting} // REMOVED THIS LINE
-            className="p-1 text-gray-400 hover:text-green-400 transition-colors opacity-50 cursor-not-allowed" // Visually indicate it's disabled/unused
-            title="Execute via Enter key in terminal"
-            aria-label="Execute command (use Enter key in terminal)"
-          >
-            {/* Removed conditional icon rendering for isExecuting */}
-            {/* <Play className="h-4 w-4" /> */}
-            {/* Placeholder icon or remove button entirely if not needed */}
-            <div className="h-4 w-4"></div> {/* Or remove the button */}
-          </button>
-          <button
-            onClick={handleClear}
-            className="p-1 text-gray-400 hover:text-blue-400 transition-colors"
-            title="Clear terminal"
-            aria-label="Clear terminal"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </button>
-        </div>
+        <button
+          onClick={handleClear}
+          className="p-1 text-gray-400 hover:text-blue-400 transition-colors"
+          title="Clear terminal"
+        >
+          <RefreshCw className="h-4 w-4" />
+        </button>
       </div>
       <div
         ref={terminalRef}
@@ -234,43 +216,6 @@ export default function Terminal({
         Press <kbd className="px-1 py-0.5 bg-gray-700 rounded">Enter</kbd> to
         execute commands
       </div>
-=======
-export default function Terminal({ onExecute, className = "" }: TerminalProps) {
-  // Very simple test to ensure the component renders and hooks work
-  const [testOutput, setTestOutput] = React.useState("Terminal is working!");
-
-  const handleTestClick = () => {
-    setTestOutput("Button clicked!");
-    // Simulate a call to onExecute
-    onExecute("test command").catch(console.error);
-  };
-
-  return (
-=======
-export default function Terminal({ onExecute, className = "" }: TerminalProps) {
-  // Very simple test to ensure the component renders and hooks work
-  const [testOutput, setTestOutput] = React.useState("Terminal is working!");
-
-  const handleTestClick = () => {
-    setTestOutput("Button clicked!");
-    // Simulate a call to onExecute
-    onExecute("test command").catch(console.error);
-  };
-
-  return (
->>>>>>> Stashed changes
-    <div className={`bg-gray-800 text-white p-4 rounded-lg ${className}`}>
-      <p className="mb-2">{testOutput}</p>
-      <button
-        onClick={handleTestClick}
-        className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-700"
-      >
-        Test Execute
-      </button>
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
     </div>
   );
 }
