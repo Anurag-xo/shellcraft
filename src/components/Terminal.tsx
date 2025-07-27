@@ -1,10 +1,15 @@
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 // src/components/Terminal.tsx
 import React, { useEffect, useRef } from "react";
 import { Terminal as XTerm } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import "xterm/css/xterm.css";
 import { RefreshCw } from "lucide-react"; // Removed Play, Square
+=======
+// src/components/Terminal.tsx (Minimal Test Version)
+import React from "react";
+>>>>>>> Stashed changes
 =======
 // src/components/Terminal.tsx (Minimal Test Version)
 import React from "react";
@@ -17,6 +22,7 @@ interface TerminalProps {
   className?: string;
 }
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 export default function Terminal({
   // code,
@@ -240,6 +246,19 @@ export default function Terminal({ onExecute, className = "" }: TerminalProps) {
   };
 
   return (
+=======
+export default function Terminal({ onExecute, className = "" }: TerminalProps) {
+  // Very simple test to ensure the component renders and hooks work
+  const [testOutput, setTestOutput] = React.useState("Terminal is working!");
+
+  const handleTestClick = () => {
+    setTestOutput("Button clicked!");
+    // Simulate a call to onExecute
+    onExecute("test command").catch(console.error);
+  };
+
+  return (
+>>>>>>> Stashed changes
     <div className={`bg-gray-800 text-white p-4 rounded-lg ${className}`}>
       <p className="mb-2">{testOutput}</p>
       <button
@@ -248,6 +267,9 @@ export default function Terminal({ onExecute, className = "" }: TerminalProps) {
       >
         Test Execute
       </button>
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
     </div>
   );
