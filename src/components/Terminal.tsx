@@ -1,9 +1,14 @@
+<<<<<<< Updated upstream
 // src/components/Terminal.tsx
 import React, { useEffect, useRef } from "react";
 import { Terminal as XTerm } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import "xterm/css/xterm.css";
 import { RefreshCw } from "lucide-react"; // Removed Play, Square
+=======
+// src/components/Terminal.tsx (Minimal Test Version)
+import React from "react";
+>>>>>>> Stashed changes
 
 interface TerminalProps {
   // code: string; // These props are likely for external sync, but internal buffer handles input
@@ -12,6 +17,7 @@ interface TerminalProps {
   className?: string;
 }
 
+<<<<<<< Updated upstream
 export default function Terminal({
   // code,
   // onCodeChange,
@@ -222,6 +228,27 @@ export default function Terminal({
         Press <kbd className="px-1 py-0.5 bg-gray-700 rounded">Enter</kbd> to
         execute commands
       </div>
+=======
+export default function Terminal({ onExecute, className = "" }: TerminalProps) {
+  // Very simple test to ensure the component renders and hooks work
+  const [testOutput, setTestOutput] = React.useState("Terminal is working!");
+
+  const handleTestClick = () => {
+    setTestOutput("Button clicked!");
+    // Simulate a call to onExecute
+    onExecute("test command").catch(console.error);
+  };
+
+  return (
+    <div className={`bg-gray-800 text-white p-4 rounded-lg ${className}`}>
+      <p className="mb-2">{testOutput}</p>
+      <button
+        onClick={handleTestClick}
+        className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-700"
+      >
+        Test Execute
+      </button>
+>>>>>>> Stashed changes
     </div>
   );
 }

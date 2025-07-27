@@ -16,9 +16,11 @@ export function useUserProgress() {
       setProgress([]);
       setLoading(false);
     }
+    // If user is undefined, Clerk is still loading.
   }, [user?.id]);
 
   const loadProgress = async () => {
+    // Guard clause if somehow called without user ID
     if (!user?.id) {
       console.warn("loadProgress called without a valid user ID.");
       setProgress([]);
@@ -30,12 +32,13 @@ export function useUserProgress() {
     setError(null);
     try {
       const data = await progressApi.getUserProgress(user.id);
+      // Sanitize data to ensure it's an array
       const safeData = Array.isArray(data) ? data : [];
       setProgress(safeData);
     } catch (err) {
       console.error("Error loading user progress for user ID:", user.id, err);
       setError(err instanceof Error ? err.message : "Failed to load progress");
-      setProgress([]);
+      setProgress([]); // Ensure state consistency
     } finally {
       setLoading(false);
     }
@@ -82,6 +85,7 @@ export function useUserProgress() {
   };
 
   const getChallengeProgress = (challengeId: string) => {
+    // Protect against progress not being an array
     if (!Array.isArray(progress)) {
       console.warn(
         "getChallengeProgress called, but progress is not an array:",

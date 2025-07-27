@@ -1,9 +1,8 @@
 // src/pages/ChallengePage.tsx
 import React, { useState, useEffect } from "react";
-import { useParams, Link, Navigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft,
-  Play,
   Check,
   RefreshCw,
   Clock,
@@ -37,19 +36,15 @@ export default function ChallengePage() {
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
+  // Safely get progress object
   const progress = getChallengeProgress(id!);
 
   useEffect(() => {
     if (challenge) {
       setCode("# Your solution here");
-      // ULTRA-DEFENSIVE CHECK before setIsSubmitted
-      if (
-        progress !== null &&
-        progress !== undefined &&
-        typeof progress === "object" &&
-        "completed" in progress
-      ) {
-        setIsSubmitted(!!progress.completed);
+      // Robust check for progress object and its completed property
+      if (progress && typeof progress === "object" && "completed" in progress) {
+        setIsSubmitted(Boolean(progress.completed));
       } else {
         setIsSubmitted(false);
       }
@@ -58,7 +53,7 @@ export default function ChallengePage() {
 
   const handleExecuteCode = async (script: string) => {
     setIsRunning(true);
-    setOutput(""); // Clear previous output
+    setOutput("");
     try {
       if (!challenge?.id) {
         throw new Error("Challenge ID is missing.");
@@ -69,7 +64,7 @@ export default function ChallengePage() {
 
       if (result.test_results && result.test_results.length > 0) {
         outputText += "\n--- Test Results ---\n";
-        result.test_results.forEach((test, index) => {
+        result.test_results.forEach((test) => {
           const status = test.passed ? "✅" : "❌";
           outputText += `${status} ${test.test_case}\n`;
           if (!test.passed) {
@@ -91,7 +86,7 @@ export default function ChallengePage() {
       }
 
       setOutput(outputText);
-      return { output: outputText, success: result.success };
+      return { output: outputText, success: result.success ?? false };
     } catch (error: any) {
       const errorMessage = `Error: ${error instanceof Error ? error.message : String(error)}`;
       setOutput(errorMessage);
@@ -163,7 +158,6 @@ export default function ChallengePage() {
 
   if (progressError) {
     console.error("ChallengePage: Error loading user progress:", progressError);
-    // Log and proceed, assuming not completed
   }
 
   if (challengeError) {
