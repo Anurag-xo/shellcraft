@@ -3,17 +3,26 @@ import React, { useEffect, useRef } from "react";
 import { Terminal as XTerm } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import "xterm/css/xterm.css";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react"; // Removed Play, Square
 
 interface TerminalProps {
+  // code: string; // These props are likely for external sync, but internal buffer handles input
+  // onCodeChange: (code: string) => void; // If needed, logic must be adjusted
   onExecute: (code: string) => Promise<{ output: string; success: boolean }>;
   className?: string;
 }
 
-export default function Terminal({ onExecute, className = "" }: TerminalProps) {
+export default function Terminal({
+  // code,
+  // onCodeChange,
+  onExecute,
+  className = "",
+}: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  // Removed unused state: const [isExecuting, setIsExecuting] = useState(false);
+  // Removed unused state: const [currentInput, setCurrentInput] = useState("");
 
   useEffect(() => {
     if (!terminalRef.current) return;
@@ -58,30 +67,29 @@ export default function Terminal({ onExecute, className = "" }: TerminalProps) {
     xtermRef.current = terminal;
     fitAddonRef.current = fitAddon;
 
-    // Focus the terminal immediately after opening
     terminal.focus();
 
-    // Initialize terminal
     terminal.writeln("\x1b[1;32m╭─ ShellCraft Terminal\x1b[0m");
     terminal.writeln(
       "\x1b[1;32m╰─\x1b[0m Type your shell commands and press Enter to execute",
     );
     terminal.write("\n\x1b[1;34muser@shellcraft\x1b[0m:\x1b[1;36m~\x1b[0m$ ");
 
-    // Use a ref to hold the input buffer so it persists correctly
     const inputBufferRef = useRef<string>("");
+    const isExecutingRef = useRef<boolean>(false); // Track execution locally
 
     const writePrompt = () => {
       terminal.write("\x1b[1;34muser@shellcraft\x1b[0m:\x1b[1;36m~\x1b[0m$ ");
     };
 
     const executeCommand = async (command: string) => {
-      // Echo the command
+      if (isExecutingRef.current) return;
+      isExecutingRef.current = true;
+
       terminal.write(`\r\n$ ${command}`);
 
       try {
         const result = await onExecute(command);
-
         if (result.output) {
           if (!result.output.startsWith("\n")) {
             terminal.write(`\r\n${result.output}`);
@@ -89,8 +97,7 @@ export default function Terminal({ onExecute, className = "" }: TerminalProps) {
             terminal.write(`${result.output}`);
           }
         }
-
-        if (result.success === false && !result.output?.includes("Error")) {
+        if (result.success === false && !result.output?.includes("Error:")) {
           terminal.write(
             `\r\n\x1b[1;31mCommand execution reported failure.\x1b[0m`,
           );
@@ -104,11 +111,14 @@ export default function Terminal({ onExecute, className = "" }: TerminalProps) {
         terminal.write("\r\n");
         writePrompt();
         inputBufferRef.current = "";
+        isExecutingRef.current = false;
         terminal.focus();
       }
     };
 
     const onDataHandler = (data: string) => {
+      if (isExecutingRef.current) return;
+
       const charCode = data.charCodeAt(0);
 
       if (data === "\r") {
@@ -124,7 +134,6 @@ export default function Terminal({ onExecute, className = "" }: TerminalProps) {
       }
 
       if (charCode === 127) {
-        // Backspace
         if (inputBufferRef.current.length > 0) {
           inputBufferRef.current = inputBufferRef.current.slice(0, -1);
           terminal.write("\b \b");
@@ -133,9 +142,10 @@ export default function Terminal({ onExecute, className = "" }: TerminalProps) {
       }
 
       if (charCode >= 32 && charCode <= 126) {
-        // Printable characters
         inputBufferRef.current += data;
         terminal.write(data);
+        // Optionally call onCodeChange(inputBufferRef.current) if external sync is needed
+        // onCodeChange(inputBufferRef.current);
         return;
       }
     };
@@ -143,7 +153,9 @@ export default function Terminal({ onExecute, className = "" }: TerminalProps) {
     const onDataDisposable = terminal.onData(onDataHandler);
 
     const handleResize = () => {
-      fitAddon.fit();
+      if (fitAddonRef.current) {
+        fitAddonRef.current.fit();
+      }
     };
     window.addEventListener("resize", handleResize);
 
@@ -152,7 +164,7 @@ export default function Terminal({ onExecute, className = "" }: TerminalProps) {
       onDataDisposable.dispose();
       terminal.dispose();
     };
-  }, [onExecute]);
+  }, [onExecute]); // Removed isExecuting, code, onCodeChange from deps
 
   const handleClear = () => {
     if (xtermRef.current) {
@@ -178,10 +190,24 @@ export default function Terminal({ onExecute, className = "" }: TerminalProps) {
           <span className="ml-4 text-sm text-gray-400">Terminal</span>
         </div>
         <div className="flex items-center space-x-2">
+          {/* Removed onClick handler that referenced undefined handleExecute */}
+          <button
+            // onClick={handleExecute} // REMOVED THIS LINE
+            // disabled={isExecuting} // REMOVED THIS LINE
+            className="p-1 text-gray-400 hover:text-green-400 transition-colors opacity-50 cursor-not-allowed" // Visually indicate it's disabled/unused
+            title="Execute via Enter key in terminal"
+            aria-label="Execute command (use Enter key in terminal)"
+          >
+            {/* Removed conditional icon rendering for isExecuting */}
+            {/* <Play className="h-4 w-4" /> */}
+            {/* Placeholder icon or remove button entirely if not needed */}
+            <div className="h-4 w-4"></div> {/* Or remove the button */}
+          </button>
           <button
             onClick={handleClear}
             className="p-1 text-gray-400 hover:text-blue-400 transition-colors"
             title="Clear terminal"
+            aria-label="Clear terminal"
           >
             <RefreshCw className="h-4 w-4" />
           </button>
