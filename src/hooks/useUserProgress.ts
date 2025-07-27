@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { useUser } from '@clerk/clerk-react';
-import { progressApi, UserProgress } from '../services/api';
+// src/hooks/useUserProgress.ts
+import { useState, useEffect } from "react";
+import { useUser } from "@clerk/clerk-react";
+import { progressApi, UserProgress } from "../services/api";
 
 export function useUserProgress() {
   const { user } = useUser();
@@ -11,27 +12,45 @@ export function useUserProgress() {
   useEffect(() => {
     if (user?.id) {
       loadProgress();
+    } else if (user !== undefined) {
+      setProgress([]);
+      setLoading(false);
     }
   }, [user?.id]);
 
   const loadProgress = async () => {
-    if (!user?.id) return;
-    
+    if (!user?.id) {
+      console.warn("loadProgress called without a valid user ID.");
+      setProgress([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
       const data = await progressApi.getUserProgress(user.id);
-      setProgress(data);
-      setError(null);
+      const safeData = Array.isArray(data) ? data : [];
+      setProgress(safeData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load progress');
-      console.error('Error loading progress:', err);
+      console.error("Error loading user progress for user ID:", user.id, err);
+      setError(err instanceof Error ? err.message : "Failed to load progress");
+      setProgress([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const updateProgress = async (challengeId: string, solution: string, completed: boolean, score: number) => {
-    if (!user?.id) return;
+  const updateProgress = async (
+    challengeId: string,
+    solution: string,
+    completed: boolean,
+    score: number,
+  ) => {
+    if (!user?.id) {
+      console.warn("updateProgress called without a valid user ID.");
+      return;
+    }
 
     try {
       const progressData = {
@@ -40,37 +59,62 @@ export function useUserProgress() {
         completed,
         score,
         solution,
-        completed_at: completed ? new Date().toISOString() : ''
+        completed_at: completed ? new Date().toISOString() : "",
       };
 
       const updatedProgress = await progressApi.updateProgress(progressData);
-      
-      setProgress(prev => {
-        const existing = prev.find(p => p.challenge_id === challengeId);
-        if (existing) {
-          return prev.map(p => p.challenge_id === challengeId ? updatedProgress : p);
+
+      setProgress((prev) => {
+        const existingIndex = prev.findIndex(
+          (p) => p.challenge_id === challengeId,
+        );
+        if (existingIndex !== -1) {
+          const updatedProgressArray = [...prev];
+          updatedProgressArray[existingIndex] = updatedProgress;
+          return updatedProgressArray;
         } else {
           return [...prev, updatedProgress];
         }
       });
-
-      return updatedProgress;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update progress');
-      throw err;
+      console.error("Error updating progress for challenge:", challengeId, err);
     }
   };
 
   const getChallengeProgress = (challengeId: string) => {
-    return progress.find(p => p.challenge_id === challengeId);
+    if (!Array.isArray(progress)) {
+      console.warn(
+        "getChallengeProgress called, but progress is not an array:",
+        progress,
+      );
+      return undefined;
+    }
+    return progress.find((p) => p.challenge_id === challengeId);
   };
 
   const getCompletedChallenges = () => {
-    return progress.filter(p => p.completed);
+    if (!Array.isArray(progress)) {
+      console.warn(
+        "getCompletedChallenges called, but progress is not an array:",
+        progress,
+      );
+      return [];
+    }
+    return progress.filter((p) => p.completed);
   };
 
   const getTotalScore = () => {
-    return progress.reduce((total, p) => total + (p.completed ? p.score : 0), 0);
+    if (!Array.isArray(progress)) {
+      console.warn(
+        "getTotalScore called, but progress is not an array:",
+        progress,
+      );
+      return 0;
+    }
+    return progress.reduce(
+      (total, p) => total + (p.completed ? p.score : 0),
+      0,
+    );
   };
 
   return {
@@ -81,6 +125,6 @@ export function useUserProgress() {
     updateProgress,
     getChallengeProgress,
     getCompletedChallenges,
-    getTotalScore
+    getTotalScore,
   };
 }

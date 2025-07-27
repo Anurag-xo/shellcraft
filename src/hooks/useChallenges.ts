@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { challengeApi, Challenge } from '../services/api';
+// src/hooks/useChallenges.ts
+import { useState, useEffect } from "react";
+import { challengeApi, Challenge } from "../services/api";
 
 export function useChallenges() {
   const [challenges, setChallenges] = useState<Challenge[]>([]);
@@ -17,53 +18,24 @@ export function useChallenges() {
       setChallenges(data);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load challenges');
-      console.error('Error loading challenges:', err);
+      setError(
+        err instanceof Error ? err.message : "Failed to load challenges",
+      );
+      console.error("Error loading challenges:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const createChallenge = async (challenge: Omit<Challenge, 'id' | 'created_at' | 'updated_at'>) => {
-    try {
-      const newChallenge = await challengeApi.create(challenge);
-      setChallenges(prev => [newChallenge, ...prev]);
-      return newChallenge;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create challenge');
-      throw err;
-    }
-  };
-
-  const updateChallenge = async (id: string, updates: Partial<Challenge>) => {
-    try {
-      const updatedChallenge = await challengeApi.update(id, updates);
-      setChallenges(prev => prev.map(c => c.id === id ? updatedChallenge : c));
-      return updatedChallenge;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update challenge');
-      throw err;
-    }
-  };
-
-  const deleteChallenge = async (id: string) => {
-    try {
-      await challengeApi.delete(id);
-      setChallenges(prev => prev.filter(c => c.id !== id));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete challenge');
-      throw err;
-    }
+  const refreshChallenges = () => {
+    loadChallenges();
   };
 
   return {
     challenges,
     loading,
     error,
-    loadChallenges,
-    createChallenge,
-    updateChallenge,
-    deleteChallenge
+    refreshChallenges,
   };
 }
 
@@ -75,6 +47,10 @@ export function useChallenge(id: string) {
   useEffect(() => {
     if (id) {
       loadChallenge(id);
+    } else {
+      // If no ID is provided, set loading to false and clear data
+      setLoading(false);
+      setChallenge(null);
     }
   }, [id]);
 
@@ -85,8 +61,9 @@ export function useChallenge(id: string) {
       setChallenge(data);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load challenge');
-      console.error('Error loading challenge:', err);
+      setError(err instanceof Error ? err.message : "Failed to load challenge");
+      console.error("Error loading challenge:", err);
+      setChallenge(null); // Ensure challenge is null on error
     } finally {
       setLoading(false);
     }
@@ -96,6 +73,6 @@ export function useChallenge(id: string) {
     challenge,
     loading,
     error,
-    loadChallenge
+    loadChallenge,
   };
 }
