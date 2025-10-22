@@ -11,7 +11,7 @@ interface User {
 
 interface UserContextType {
   user: User | null;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string) => Promise<void>;
   logout: () => void;
   updateProgress: (challengeId: string, score: number) => void;
 }
@@ -38,7 +38,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return null;
   });
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string) => {
     // Mock login - ONLY in development
     if (process.env.NODE_ENV === "development") {
       console.warn("Using MOCK login. This should not appear in production.");
