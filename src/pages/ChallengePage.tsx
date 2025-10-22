@@ -2,9 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft,
-  Play,
   Check,
-  RefreshCw,
   Clock,
   Trophy,
   Users,
@@ -14,6 +12,7 @@ import { useChallenge } from "../hooks/useChallenges";
 import { useUserProgress } from "../hooks/useUserProgress";
 import { executionApi } from "../services/api";
 import Terminal from "../components/Terminal";
+import { Example } from "../lib/supabase";
 
 export default function ChallengePage() {
   const { id } = useParams<{ id: string }>();
@@ -22,7 +21,7 @@ export default function ChallengePage() {
   const { updateProgress, getChallengeProgress } = useUserProgress();
   const [code, setCode] = useState("");
   const [output, setOutput] = useState("");
-  const [isRunning, setIsRunning] = useState(false);
+  
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const progress = getChallengeProgress(id!);
@@ -35,7 +34,7 @@ export default function ChallengePage() {
   }, [challenge, progress]);
 
   const handleExecuteCode = async (script: string) => {
-    setIsRunning(true);
+    
 
     try {
       const result = await executionApi.executeScript(script, challenge?.id);
@@ -44,7 +43,7 @@ export default function ChallengePage() {
 
       if (result.test_results && result.test_results.length > 0) {
         outputText += "\n\n--- Test Results ---\n";
-        result.test_results.forEach((test, index) => {
+        result.test_results.forEach((test) => {
           const status = test.passed ? "✅" : "❌";
           outputText += `${status} ${test.test_case}\n`;
           if (!test.passed && test.expected) {
@@ -66,16 +65,10 @@ export default function ChallengePage() {
       const errorMessage = `Error: ${error instanceof Error ? error.message : "Unknown error"}`;
       setOutput(errorMessage);
       return { output: errorMessage, success: false };
-    } finally {
-      setIsRunning(false);
-    }
+    
   };
 
-  const handleReset = () => {
-    setCode("# Your solution here\n");
-    setOutput("");
-    setIsSubmitted(false);
-  };
+  
 
   if (challengeLoading) {
     return (
@@ -194,7 +187,7 @@ export default function ChallengePage() {
                 Example
               </h2>
               {challenge.examples &&
-                challenge.examples.map((example: any, index: number) => (
+                challenge.examples.map((example: Example, index: number) => (
                   <div key={index} className="mb-4">
                     <div className="mb-2">
                       <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
