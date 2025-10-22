@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useUser } from '@clerk/clerk-react';
-import { User, Mail, Calendar, Trophy, Target, TrendingUp, Edit3, Save, X } from 'lucide-react';
+import { Calendar, Trophy, Target, TrendingUp, Edit3, Save, X } from 'lucide-react';
 import { useUserProgress } from '../hooks/useUserProgress';
 
 export default function ProfilePage() {
   const { user, isLoaded } = useUser();
-  const { progress, getTotalScore, getCompletedChallenges } = useUserProgress();
+  const { getTotalScore, getCompletedChallenges } = useUserProgress();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     firstName: user?.firstName || '',
