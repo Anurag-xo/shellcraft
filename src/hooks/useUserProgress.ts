@@ -12,7 +12,7 @@ export function useUserProgress() {
     if (user?.id) {
       loadProgress();
     }
-  }, [user?.id]);
+  }, [user?.id, loadProgress]);
 
   const loadProgress = async () => {
     if (!user?.id) return;
