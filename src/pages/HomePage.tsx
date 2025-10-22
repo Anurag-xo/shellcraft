@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Terminal, Code, Trophy, Users, ArrowRight, Play, CheckCircle, Clock } from 'lucide-react';
+import { Terminal, Code, Trophy, Users, ArrowRight, Play, CheckCircle } from 'lucide-react';
 
 export default function HomePage() {
   const featuredChallenges = [
