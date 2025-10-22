@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Save, X, Search, Filter } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Search } from 'lucide-react';
 
 interface Challenge {
   id: string;
