@@ -2,21 +2,19 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Terminal as XTerm } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
-import { Play, Square, RefreshCw } from 'lucide-react';
+import { Play, RefreshCw } from 'lucide-react';
 
 interface TerminalProps {
-  code: string;
-  onCodeChange: (code: string) => void;
   onExecute: (code: string) => Promise<{ output: string; success: boolean }>;
   className?: string;
 }
 
-export default function Terminal({ code, onCodeChange, onExecute, className = '' }: TerminalProps) {
+export default function Terminal({ onExecute, className = '' }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [currentInput, setCurrentInput] = useState('');
+  
 
   useEffect(() => {
     if (!terminalRef.current) return;
@@ -97,7 +95,7 @@ export default function Terminal({ code, onCodeChange, onExecute, className = ''
       if (code >= 32 && code <= 126) {
         inputBuffer += data;
         terminal.write(data);
-        onCodeChange(inputBuffer);
+        
       }
     });
 
@@ -149,16 +147,7 @@ export default function Terminal({ code, onCodeChange, onExecute, className = ''
     }
   };
 
-  const handleExecute = async () => {
-    if (currentInput.trim() && !isExecuting) {
-      setIsExecuting(true);
-      try {
-        await onExecute(currentInput.trim());
-      } finally {
-        setIsExecuting(false);
-      }
-    }
-  };
+  
 
   return (
     <div className={`bg-gray-900 rounded-lg overflow-hidden ${className}`}>
@@ -170,18 +159,7 @@ export default function Terminal({ code, onCodeChange, onExecute, className = ''
           <span className="ml-4 text-sm text-gray-400">Terminal</span>
         </div>
         <div className="flex items-center space-x-2">
-          <button
-            onClick={handleExecute}
-            disabled={isExecuting}
-            className="p-1 text-gray-400 hover:text-green-400 transition-colors disabled:opacity-50"
-            title="Execute (Ctrl+Enter)"
-          >
-            {isExecuting ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              <Play className="h-4 w-4" />
-            )}
-          </button>
+          
           <button
             onClick={handleClear}
             className="p-1 text-gray-400 hover:text-blue-400 transition-colors"
