@@ -7,6 +7,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
+
+interface Example {
+  input: string;
+  output: string;
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type Database = {
@@ -21,7 +27,7 @@ export type Database = {
           difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
           category: string;
           points: number;
-          examples: any;
+          examples: Example[];
           test_cases: string[];
           created_at: string;
           updated_at: string;
@@ -34,7 +40,7 @@ export type Database = {
           difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
           category: string;
           points: number;
-          examples?: any;
+          examples?: Example[];
           test_cases?: string[];
           created_at?: string;
           updated_at?: string;
@@ -47,7 +53,7 @@ export type Database = {
           difficulty?: 'Beginner' | 'Intermediate' | 'Advanced';
           category?: string;
           points?: number;
-          examples?: any;
+          examples?: Example[];
           test_cases?: string[];
           updated_at?: string;
         };
