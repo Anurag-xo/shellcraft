@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Terminal, Moon, Sun, Menu, X, User, Settings, LogOut } from 'lucide-react';
+import { Terminal, Moon, Sun, Menu, X, LogOut } from 'lucide-react';
 import { useUser, SignOutButton } from '@clerk/clerk-react';
 import { useTheme } from '../contexts/ThemeContext';
 
